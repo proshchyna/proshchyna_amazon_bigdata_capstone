@@ -267,4 +267,4 @@ def main(mode, stream=None):
 
 
 if __name__ == "__main__":
-    generate_or_load_items(50)
+    generate_or_load_items(200)

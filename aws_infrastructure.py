@@ -1,5 +1,9 @@
 import boto3
-
+from data_generator import get_postgres_connection
+from time import sleep
+import settings
+import os
+import psycopg2
 # s3_client = boto3.client('s3')
 
 # result = s3_client.create_bucket(Bucket='test_delete_me_please')
@@ -13,7 +17,7 @@ def create_key_pair(key_pair_name: str) -> None:
 		f.write(response['KeyMaterial'])
 
 
-def launch_ec2_instance(meta):
+def launch_ec2_instance():
 	ec2 = boto3.resource('ec2')
 
 	response = ec2.create_instances(
@@ -21,7 +25,7 @@ def launch_ec2_instance(meta):
 		MinCount=1,
 		MaxCount=1,
 		InstanceType='t2.micro',
-		KeyName=meta['KeyPairName'],
+		KeyName=os.environ.get('KeyPairName'),
 	)
 
 	instance_id = response[0].id
@@ -30,60 +34,133 @@ def launch_ec2_instance(meta):
 	return instance_id
 
 
-def launch_rds(meta):
-	client = boto3.client('rds')
+def launch_rds():
+	from random import choices
+	import string
+	import json
 
-	client.create_db_instance(DBInstanceIdentifier=meta['DBInstanceIdentifier'],
+	client = boto3.client('rds')
+	dynamodb = boto3.client('dynamodb')
+	secretsmanager = boto3.client('secretsmanager')
+
+	db_password = ''.join(choices(string.ascii_uppercase + string.digits, k=14))
+	client.create_db_instance(DBInstanceIdentifier=os.environ.get('DBInstanceIdentifier'),
 							  DBInstanceClass='db.t2.micro',
 							  Engine='postgres',
-							  MasterUsername=meta['MasterUsername'],
-							  MasterUserPassword=meta['MasterUserPassword'],
+							  MasterUsername=os.environ.get('MasterUsername'),
+							  MasterUserPassword=db_password,
 							  AllocatedStorage=10)
+
+	try:
+		secretsmanager.create_secret(SecretId=os.environ.get('SecretId'),
+							 SecretString=json.dumps({"name": os.environ.get('MasterUsername'), "password": db_password}))
+	except:
+		secretsmanager.update_secret(SecretId=os.environ.get('SecretId'),
+							 SecretString=json.dumps({"name": os.environ.get('MasterUsername'), "password": db_password}))
+
+	while True:
+		db_info = client.describe_db_instances(DBInstanceIdentifier=os.environ.get('DBInstanceIdentifier'))
+		status = db_info['DBInstances'][0]['DBInstanceStatus']
+		if status == 'available':
+			break
+		sleep(5)
+
+	db_info = client.describe_db_instances(DBInstanceIdentifier=os.environ.get('DBInstanceIdentifier'))
+	host = db_info['DBInstances'][0]['Endpoint']['Address']
+	dynamodb.put_item(TableName=os.environ.get('DynamoDb_table_name'), Item={'PostgresHost': {'S': host}, 'id': {'N': '1'}})
+
 	print("Postgres instance created!")
 
 
-def clean_infrastructure(meta):
+def create_table_in_rds():
+	create_table_statement = """CREATE TABLE IF NOT EXISTS ITEM(
+	ITEM_ID 		SERIAL 		PRIMARY KEY,
+	TITLE           CHAR(50)    NOT NULL,
+	DESCRIPTION		TEXT,
+	CATEGORY        CHAR(50)	NOT NULL);
+	"""
+	try:
+		connection = get_postgres_connection()
+		cursor = connection.cursor()
+		cursor.execute(create_table_statement)
+	except(Exception, psycopg2.DatabaseError) as error:
+		print("Error while creating PostgreSQL table", error)
+	finally:
+		cursor.close()
+		connection.commit()
+
+
+def create_metadata_table_in_dynamodb(table_name='proshchy_capstone_metadata'):
+	client = boto3.client('dynamodb')
+	client.create_table(AttributeDefinitions=[{'AttributeName': 'id', 'AttributeType': 'N'}],
+						TableName=table_name,
+						KeySchema=[{'AttributeName': 'id', 'KeyType': 'HASH'}],
+						BillingMode='PAY_PER_REQUEST')
+
+	print("Meta data table was created in DynamoDB!")
+
+
+def clean_infrastructure():
 	try:
 		resource = boto3.resource('ec2')
-		key_pair = resource.KeyPair(meta['KeyPairName'])
+		key_pair = resource.KeyPair(os.environ.get('KeyPairName'))
 		key_pair_id = key_pair.key_pair_id
 		key_pair.delete()
 	except:
 		pass
 	finally:
-		print(f"Key Pair {meta['KeyPairName']} removed!")
+		print(f"Key Pair {os.environ.get('KeyPairName')} removed!")
 
 	client = boto3.client('ec2')
-	result = client.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': [meta['ec2_instance_name']]}])
+	result = client.describe_instances(Filters=[{'Name': 'tag:Name', 'Values': [os.environ.get('ec2_instance_name')]}])
 
 	instances_to_terminate = []
 	for group in result['Reservations']:
 		for instance in group['Instances']:
 			instances_to_terminate.append(instance['InstanceId'])
+	if instances_to_terminate:
+		client.terminate_instances(InstanceIds=instances_to_terminate)
+		print("EC2 instances terminated!")
+	else:
+		print("Have no running EC2 instances!")
 
-	client.terminate_instances(InstanceIds=instances_to_terminate)
-	print("EC2 instances terminated!")
+	try:
+		client = boto3.client('rds')
+		client.delete_db_instance(DBInstanceIdentifier=os.environ.get('DBInstanceIdentifier'), SkipFinalSnapshot=True)
 
-	client = boto3.client('rds')
-	client.delete_db_instance(DBInstanceIdentifier=meta['DBInstanceIdentifier'], SkipFinalSnapshot=True)
-	print("Postgres instance deleted!")
+		while True:
+			try:
+				client.describe_db_instances(DBInstanceIdentifier=os.environ.get('DBInstanceIdentifier'))
+			except:
+				break
+			sleep(10)
+			print("DB is not deleted yet")
+		print("Postgres instance deleted!")
+	except:
+		print("Have no RDS to delete!")
+
+	try:
+		client = boto3.client('dynamodb')
+		client.delete_table(TableName=os.environ.get('DynamoDb_table_name'))
+		print('proshchy_capstone_metadata table deleted from DynamoDB')
+		sleep(10)
+	except:
+		print("Nothing to clean in DynamoDB!")
 
 
 def main():
-	meta = {'KeyPairName': 'proshchy_capstone_ec2',
-			'ec2_instance_name': 'proshchy_capstone_ec2_instance',
-			'DBInstanceIdentifier': 'proshchy-capstone-db',
-			'MasterUsername': 'proshchyna',
-			'MasterUserPassword': '111proshchyna1111'
-			}
-
-	clean_infrastructure(meta)
+	print(os.environ.get("KeyPairName"))
+	# clean_infrastructure(meta)
+	# create_metadata_table_in_dynamodb()
 
 	# create_key_pair(key_pair_name=meta['KeyPairName'])
-	#
+
 	# instance_id = launch_ec2_instance(meta)
 	# meta['ec2_instance_id'] = instance_id
 
-# {'DBInstances': [{'DBInstanceIdentifier': 'proshchy-capstone-db', 'DBInstanceClass': 'db.t2.micro', 'Engine': 'postgres', 'DBInstanceStatus': 'available', 'MasterUsername': 'proshchyna', 'Endpoint': {'Address': 'proshchy-capstone-db.cnz7flo1slhx.us-east-2.rds.amazonaws.com', 'Port': 5432, 'HostedZoneId': 'Z2XHWR1WZ565X2'}, 'AllocatedStorage': 10, 'InstanceCreateTime': datetime.datetime(2020, 11, 28, 14, 35, 3, 110000, tzinfo=tzutc()), 'PreferredBackupWindow': '10:04-10:34', 'BackupRetentionPeriod': 1, 'DBSecurityGroups': [], 'VpcSecurityGroups': [{'VpcSecurityGroupId': 'sg-29509c4e', 'Status': 'active'}], 'DBParameterGroups': [{'DBParameterGroupName': 'default.postgres12', 'ParameterApplyStatus': 'in-sync'}], 'AvailabilityZone': 'us-east-2c', 'DBSubnetGroup': {'DBSubnetGroupName': 'default', 'DBSubnetGroupDescription': 'default', 'VpcId': 'vpc-6add1d01', 'SubnetGroupStatus': 'Complete', 'Subnets': [{'SubnetIdentifier': 'subnet-5bc54c17', 'SubnetAvailabilityZone': {'Name': 'us-east-2c'}, 'SubnetOutpost': {}, 'SubnetStatus': 'Active'}, {'SubnetIdentifier': 'subnet-c2c4e2b8', 'SubnetAvailabilityZone': {'Name': 'us-east-2b'}, 'SubnetOutpost': {}, 'SubnetStatus': 'Active'}, {'SubnetIdentifier': 'subnet-ea20c881', 'SubnetAvailabilityZone': {'Name': 'us-east-2a'}, 'SubnetOutpost': {}, 'SubnetStatus': 'Active'}]}, 'PreferredMaintenanceWindow': 'fri:03:12-fri:03:42', 'PendingModifiedValues': {}, 'LatestRestorableTime': datetime.datetime(2020, 11, 28, 15, 16, 15, tzinfo=tzutc()), 'MultiAZ': False, 'EngineVersion': '12.4', 'AutoMinorVersionUpgrade': True, 'ReadReplicaDBInstanceIdentifiers': [], 'LicenseModel': 'postgresql-license', 'OptionGroupMemberships': [{'OptionGroupName': 'default:postgres-12', 'Status': 'in-sync'}], 'PubliclyAccessible': True, 'StorageType': 'gp2', 'DbInstancePort': 0, 'StorageEncrypted': False, 'DbiResourceId': 'db-F3DGJ3VTBFZX7JRMCTF4G3XULQ', 'CACertificateIdentifier': 'rds-ca-2019', 'DomainMemberships': [], 'CopyTagsToSnapshot': False, 'MonitoringInterval': 0, 'DBInstanceArn': 'arn:aws:rds:us-east-2:571632058847:db:proshchy-capstone-db', 'IAMDatabaseAuthenticationEnabled': False, 'PerformanceInsightsEnabled': False, 'DeletionProtection': False, 'AssociatedRoles': [], 'TagList': []}, {'DBInstanceIdentifier': 'vkharchenko-db-cluster-instance-1', 'DBInstanceClass': 'db.r5.large', 'Engine': 'aurora-mysql', 'DBInstanceStatus': 'stopped', 'MasterUsername': 'admin', 'DBName': 'vkharchenko_db', 'Endpoint': {'Address': 'vkharchenko-db-cluster-instance-1.cnz7flo1slhx.us-east-2.rds.amazonaws.com', 'Port': 3306, 'HostedZoneId': 'Z2XHWR1WZ565X2'}, 'AllocatedStorage': 1, 'InstanceCreateTime': datetime.datetime(2020, 11, 22, 19, 44, 51, 971000, tzinfo=tzutc()), 'PreferredBackupWindow': '04:02-04:32', 'BackupRetentionPeriod': 1, 'DBSecurityGroups': [], 'VpcSecurityGroups': [{'VpcSecurityGroupId': 'sg-29509c4e', 'Status': 'active'}], 'DBParameterGroups': [{'DBParameterGroupName': 'default.aurora-mysql5.7', 'ParameterApplyStatus': 'in-sync'}], 'AvailabilityZone': 'us-east-2b', 'DBSubnetGroup': {'DBSubnetGroupName': 'default-vpc-6add1d01', 'DBSubnetGroupDescription': 'Created from the RDS Management Console', 'VpcId': 'vpc-6add1d01', 'SubnetGroupStatus': 'Complete', 'Subnets': [{'SubnetIdentifier': 'subnet-5bc54c17', 'SubnetAvailabilityZone': {'Name': 'us-east-2c'}, 'SubnetOutpost': {}, 'SubnetStatus': 'Active'}, {'SubnetIdentifier': 'subnet-c2c4e2b8', 'SubnetAvailabilityZone': {'Name': 'us-east-2b'}, 'SubnetOutpost': {}, 'SubnetStatus': 'Active'}, {'SubnetIdentifier': 'subnet-ea20c881', 'SubnetAvailabilityZone': {'Name': 'us-east-2a'}, 'SubnetOutpost': {}, 'SubnetStatus': 'Active'}]}, 'PreferredMaintenanceWindow': 'sat:04:37-sat:05:07', 'PendingModifiedValues': {}, 'MultiAZ': False, 'EngineVersion': '5.7.mysql_aurora.2.07.2', 'AutoMinorVersionUpgrade': True, 'ReadReplicaDBInstanceIdentifiers': [], 'LicenseModel': 'general-public-license', 'OptionGroupMemberships': [{'OptionGroupName': 'default:aurora-mysql-5-7', 'Status': 'in-sync'}], 'PubliclyAccessible': False, 'StorageType': 'aurora', 'DbInstancePort': 0, 'DBClusterIdentifier': 'vkharchenko-db-cluster', 'StorageEncrypted': True, 'KmsKeyId': 'arn:aws:kms:us-east-2:571632058847:key/b2868566-70e3-4c02-b5ee-9be476768525', 'DbiResourceId': 'db-KOUEGMQYXZ7Q4H6LNHQBANOH4A', 'CACertificateIdentifier': 'rds-ca-2019', 'DomainMemberships': [], 'CopyTagsToSnapshot': False, 'MonitoringInterval': 0, 'MonitoringRoleArn': 'arn:aws:iam::571632058847:role/rds-monitoring-role', 'PromotionTier': 1, 'DBInstanceArn': 'arn:aws:rds:us-east-2:571632058847:db:vkharchenko-db-cluster-instance-1', 'IAMDatabaseAuthenticationEnabled': False, 'PerformanceInsightsEnabled': True, 'PerformanceInsightsKMSKeyId': 'arn:aws:kms:us-east-2:571632058847:key/b2868566-70e3-4c02-b5ee-9be476768525', 'PerformanceInsightsRetentionPeriod': 7, 'DeletionProtection': False, 'AssociatedRoles': [], 'TagList': []}], 'ResponseMetadata': {'RequestId': 'a0c18a3a-0c74-403d-9b58-dfe2720db0ff', 'HTTPStatusCode': 200, 'HTTPHeaders': {'x-amzn-requestid': 'a0c18a3a-0c74-403d-9b58-dfe2720db0ff', 'content-type': 'text/xml', 'content-length': '9414', 'vary': 'accept-encoding', 'date': 'Sat, 28 Nov 2020 15:22:31 GMT'}, 'RetryAttempts': 0}}
+	# launch_rds(meta)
+	create_table_in_rds()
+
+
 if __name__ == '__main__':
 	main()
