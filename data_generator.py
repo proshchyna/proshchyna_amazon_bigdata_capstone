@@ -3,6 +3,9 @@ import boto3
 import json
 import settings
 import os
+from faker import Faker
+from datetime import datetime, timedelta
+import random
 
 
 def get_postgres_connection():
@@ -39,5 +42,55 @@ def upload_items_to_postgres():
 		connection.commit()
 
 
+def get_item_ids_from_postgres() -> list:
+	connection = get_postgres_connection()
+	cursor = connection.cursor()
+
+	cursor.execute("SELECT item_id from item;")
+	item_ids = [str(item[0]) for item in cursor]
+	cursor.close()
+	random.shuffle(item_ids)
+
+	return item_ids
+
+
+def generate_views(size=100, datetime_interval=1):
+	faker = Faker()
+	item_ids = get_item_ids_from_postgres()
+	datetime_start = datetime.now() - timedelta(datetime_interval)
+	timestamps = [str(faker.date_time_between_dates(datetime_start=datetime_start).timestamp()) for _ in range(size)]
+	user_agents = [faker.user_agent() for _ in range(size)]
+	ips = [faker.ipv4() for _ in range(size)]
+
+	views = list(zip(item_ids, timestamps, user_agents, ips))
+	header = 'item_id,timestamp,user_agent,ip\n'
+	with open('views.csv', 'w+') as views_file:
+		views_file.write(header)
+		for view in views:
+			views_file.write(','.join(view) + '\n')
+
+
+def generate_review(size=100, datetime_interval=1):
+	faker = Faker()
+	item_ids = get_item_ids_from_postgres()
+	datetime_start = datetime.now() - timedelta(datetime_interval)
+	timestamps = [str(faker.date_time_between_dates(datetime_start=datetime_start).timestamp()) for _ in range(size)]
+	user_agents = [faker.user_agent() for _ in range(size)]
+	ips = [faker.ipv4() for _ in range(size)]
+	review_titles = [faker.word() for _ in range(size)]
+	review_texts = [faker.text(max_nb_chars=200).replace('\n', '') for _ in range(size)]
+	stars = [str(faker.random_number(digits=1)) for _ in range(size)]
+
+	reviews = list(zip(item_ids, timestamps, user_agents, ips, review_titles, review_texts, stars))
+	header = 'item_id\ttimestamp\tuser_agent\tip\treview_title\treview_text\tstars\n'
+	with open('reviews.tsv', 'w+') as reviews_file:
+		reviews_file.write(header)
+		for review in reviews:
+			reviews_file.write('\t'.join(review) + '\n')
+
+
 if __name__ == "__main__":
-	upload_items_to_postgres()
+	# upload_items_to_postgres()
+	# get_item_ids_from_postgres()
+	# generate_views(size=10)
+	generate_review(size=10)
