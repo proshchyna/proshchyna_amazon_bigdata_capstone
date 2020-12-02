@@ -1,11 +1,17 @@
 import psycopg2
 import boto3
 import json
-import settings
 import os
 from faker import Faker
 from datetime import datetime, timedelta
 import random
+import configs.settings
+from generate_items import generate_or_load_items
+
+
+def generate_items_if_needed(size):
+	if not os.path.exists('data/items.csv'):
+		generate_or_load_items(size)
 
 
 def get_postgres_connection():
@@ -27,7 +33,7 @@ def get_postgres_connection():
 
 def upload_items_to_postgres():
 	insert_statement = "INSERT INTO item (title, description, category) values ('{}', '{}', '{}')"
-	with open('items.csv') as items:
+	with open('data/items.csv') as items:
 		connection = get_postgres_connection()
 		cursor = connection.cursor()
 		line_counter = 0
@@ -64,7 +70,8 @@ def generate_views(size=100, datetime_interval=1):
 
 	views = list(zip(item_ids, timestamps, user_agents, ips))
 	header = 'item_id,timestamp,user_agent,ip\n'
-	with open('views.csv', 'w+') as views_file:
+	file_prefix = str(datetime.now().timestamp())
+	with open(f'data/views/{file_prefix}_view.csv', 'w+') as views_file:
 		views_file.write(header)
 		for view in views:
 			views_file.write(','.join(view) + '\n')
@@ -83,14 +90,16 @@ def generate_reviews(size=100, datetime_interval=1):
 
 	reviews = list(zip(item_ids, timestamps, user_agents, ips, review_titles, review_texts, stars))
 	header = 'item_id\ttimestamp\tuser_agent\tip\treview_title\treview_text\tstars\n'
-	with open('reviews.tsv', 'w+') as reviews_file:
+	file_prefix = str(datetime.now().timestamp())
+	with open(f'data/reviews/{file_prefix}_reviews.tsv', 'w+') as reviews_file:
 		reviews_file.write(header)
 		for review in reviews:
 			reviews_file.write('\t'.join(review) + '\n')
 
 
 if __name__ == "__main__":
-	# upload_items_to_postgres()
+	generate_items_if_needed(100)
+	upload_items_to_postgres()
 	# get_item_ids_from_postgres()
-	# generate_views(size=10)
+	generate_views(size=10)
 	generate_reviews(size=10)
