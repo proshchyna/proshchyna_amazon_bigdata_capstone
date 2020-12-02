@@ -1,4 +1,3 @@
-sudo yum -y update
 sudo yum -y install python3
 sudo yum -y install git
 
