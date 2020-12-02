@@ -12,10 +12,15 @@ def create_key_pair(key_pair_name: str) -> None:
 	response = client.create_key_pair(KeyName=key_pair_name)
 
 	key_path = f'configs/{response["KeyName"]}.pem'
+	try:
+		os.chmod(key_path, 0o777)
+	except:
+		pass
+
 	with open(key_path, 'w+') as f:
 		f.write(response['KeyMaterial'])
 
-	os.chmod(key_path, 444)
+	os.chmod(key_path, 0o400)
 
 
 def launch_ec2_instance():
@@ -35,8 +40,10 @@ def launch_ec2_instance():
 
 	instance = ec2.Instance(instance_id)
 	instance.wait_until_running()
+	ip = instance.public_ip_address
+	print(f"FUCKING IP is: {ip}")
 	print(f"EC2 instance: {instance_id} launched!")
-	return instance_id
+	return instance_id, ip
 
 
 def launch_rds():
@@ -140,7 +147,7 @@ def clean_rds():
 				client.describe_db_instances(DBInstanceIdentifier=os.environ.get('DBInstanceIdentifier'))
 			except:
 				break
-			sleep(10)
+			sleep(20)
 			print("DB is not deleted yet")
 		print("Postgres instance deleted!")
 	except:
@@ -159,14 +166,13 @@ def clean_dynamodb():
 
 def clean_infrastructure():
 	clean_ec2()
-	clean_rds()
-	clean_dynamodb()
+	# clean_rds()
+	# clean_dynamodb()
 
 
 def configure_ec2_instance():
-	print(os.getenv('ec2_instance_id'))
 	# 'ec2-18-223-247-115.us-east-2.compute.amazonaws.com'
-	ssh_connect_with_retry(ssh, 'ec2-18-223-247-115.us-east-2.compute.amazonaws.com', 0)
+	ssh_connect_with_retry(ssh, os.environ.get('ec2_ip_address'), 0)
 	sftp = ssh.open_sftp()
 
 	# stdin, stdout, stderr = ssh.exec_command("ls -l")
@@ -177,7 +183,8 @@ def configure_ec2_instance():
 	ssh.exec_command("mkdir .aws")
 	sftp.put(localpath='configs/.aws/config', remotepath='/home/ec2-user/.aws/config')
 	sftp.put(localpath='configs/.aws/credentials', remotepath='/home/ec2-user/.aws/credentials')
-	ssh.exec_command('sh proshchyna_amazon_bigdata_capstone/configs/configure_ec2_environment.sh')
+	sftp.put(localpath='configs/configure_ec2_environment.sh', remotepath='/home/ec2-user/configure_ec2_environment.sh')
+	ssh.exec_command('sh /home/ec2-user/configure_ec2_environment.sh')
 	print("EC2 instance configured successfully!")
 	sftp.close()
 	ssh.close()
@@ -186,15 +193,17 @@ def configure_ec2_instance():
 def main():
 	print(os.environ.get("KeyPairName"))
 	clean_infrastructure()
-	create_metadata_table_in_dynamodb()
+	# create_metadata_table_in_dynamodb()
 
 	create_key_pair(key_pair_name=os.environ.get('KeyPairName'))
 
-	instance_id = launch_ec2_instance()
+	instance_id, ip = launch_ec2_instance()
 	os.environ['ec2_instance_id'] = instance_id
-	print(os.environ.get('ec2_instance_id'))
-	launch_rds()
-	create_table_in_rds()
+	os.environ['ec2_ip_address'] = ip
+
+	print(os.environ.get('ec2_instance_id'), os.environ.get('ec2_ip_address'))
+	# launch_rds()
+	# create_table_in_rds()
 	configure_ec2_instance()
 
 
