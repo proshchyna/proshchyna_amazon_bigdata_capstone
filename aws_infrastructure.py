@@ -29,8 +29,9 @@ def launch_ec2_instance():
 	)
 
 	instance_id = response[0].id
-	response[0].create_tags(Resources=['i-0fe9f1b4f3bfb4d43'],
+	response[0].create_tags(Resources=[instance_id],
 							Tags=[{'Key': 'Name', 'Value': 'proshchy_capstone_ec2_instance'}])
+	print(f"EC2 instance: {instance_id} launched!")
 	return instance_id
 
 
@@ -100,7 +101,7 @@ def create_metadata_table_in_dynamodb(table_name='proshchy_capstone_metadata'):
 	print("Meta data table was created in DynamoDB!")
 
 
-def clean_infrastructure():
+def clean_ec2():
 	try:
 		resource = boto3.resource('ec2')
 		key_pair = resource.KeyPair(os.environ.get('KeyPairName'))
@@ -124,6 +125,8 @@ def clean_infrastructure():
 	else:
 		print("Have no running EC2 instances!")
 
+
+def clean_rds():
 	try:
 		client = boto3.client('rds')
 		client.delete_db_instance(DBInstanceIdentifier=os.environ.get('DBInstanceIdentifier'), SkipFinalSnapshot=True)
@@ -139,6 +142,8 @@ def clean_infrastructure():
 	except:
 		print("Have no RDS to delete!")
 
+
+def clean_dynamodb():
 	try:
 		client = boto3.client('dynamodb')
 		client.delete_table(TableName=os.environ.get('DynamoDb_table_name'))
@@ -148,18 +153,24 @@ def clean_infrastructure():
 		print("Nothing to clean in DynamoDB!")
 
 
+def clean_infrastructure():
+	clean_ec2()
+	# clean_rds()
+	# clean_dynamodb()
+
+
 def main():
 	print(os.environ.get("KeyPairName"))
-	# clean_infrastructure(meta)
+	clean_infrastructure()
 	# create_metadata_table_in_dynamodb()
 
-	# create_key_pair(key_pair_name=meta['KeyPairName'])
+	create_key_pair(key_pair_name=os.environ.get('KeyPairName'))
 
-	# instance_id = launch_ec2_instance(meta)
-	# meta['ec2_instance_id'] = instance_id
-
+	instance_id = launch_ec2_instance()
+	os.environ['ec2_instance_id'] = instance_id
+	print(os.environ.get('ec2_instance_id'))
 	# launch_rds(meta)
-	create_table_in_rds()
+	# create_table_in_rds()
 
 
 if __name__ == '__main__':

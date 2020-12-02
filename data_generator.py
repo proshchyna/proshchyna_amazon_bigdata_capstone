@@ -70,7 +70,7 @@ def generate_views(size=100, datetime_interval=1):
 			views_file.write(','.join(view) + '\n')
 
 
-def generate_review(size=100, datetime_interval=1):
+def generate_reviews(size=100, datetime_interval=1):
 	faker = Faker()
 	item_ids = get_item_ids_from_postgres()
 	datetime_start = datetime.now() - timedelta(datetime_interval)
@@ -93,4 +93,4 @@ if __name__ == "__main__":
 	# upload_items_to_postgres()
 	# get_item_ids_from_postgres()
 	# generate_views(size=10)
-	generate_review(size=10)
+	generate_reviews(size=10)
