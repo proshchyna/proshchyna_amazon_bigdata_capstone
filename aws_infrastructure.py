@@ -11,8 +11,11 @@ def create_key_pair(key_pair_name: str) -> None:
 	client = boto3.client('ec2')
 	response = client.create_key_pair(KeyName=key_pair_name)
 
-	with open(f'configs/{response["KeyName"]}.pem', 'w+') as f:
+	key_path = f'configs/{response["KeyName"]}.pem'
+	with open(key_path, 'w+') as f:
 		f.write(response['KeyMaterial'])
+
+	os.chmod(key_path, 444)
 
 
 def launch_ec2_instance():
