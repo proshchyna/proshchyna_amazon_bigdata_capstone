@@ -42,7 +42,6 @@ def upload_items_to_postgres():
 			if line_counter > 0:
 				data = line.split(',')
 				cursor.execute(insert_statement.format(data[1], data[2], data[3].replace('\n', '')))
-				print(data[0], data[1], data[2], data[3].replace('\n', ''))
 			line_counter += 1
 		cursor.close()
 		connection.commit()
