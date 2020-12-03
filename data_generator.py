@@ -10,7 +10,7 @@ from generate_items import generate_or_load_items
 
 
 def generate_items_if_needed(size):
-	if not os.path.exists('data/items.csv'):
+	if not os.path.exists('items.csv'):
 		generate_or_load_items(size)
 
 

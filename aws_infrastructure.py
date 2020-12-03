@@ -264,6 +264,7 @@ def main():
 	print(os.environ.get('ec2_instance_id'), os.environ.get('ec2_ip_address'))
 	# launch_rds()
 	# create_table_in_rds()
+	# creating_iam_roles_with_policies()
 	configure_ec2_instance()
 	launch_kinesis_data_stream()
 

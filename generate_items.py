@@ -35,7 +35,7 @@ from datetime import datetime, timedelta
 N_ITEMS = 100
 # BOT_PROBABILITY = 0.1
 #
-ITEMS_FILE = "data/items.csv"
+ITEMS_FILE = "items.csv"
 # USERS_FILE = "users.csv"
 #
 # TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"

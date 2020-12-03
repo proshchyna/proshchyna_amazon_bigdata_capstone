@@ -11,5 +11,5 @@ source proshchyna_amazon_bigdata_capstone/venv/bin/activate && cd proshchyna_ama
 
 # install and set up kinesis agent
 sudo yum -y install aws-kinesis-agent
-sudo mv agent.json /etc/aws-kinesis/agent.json
+sudo mv /home/ec2-user/agent.json /etc/aws-kinesis/agent.json
 sudo service aws-kinesis-agent restart
