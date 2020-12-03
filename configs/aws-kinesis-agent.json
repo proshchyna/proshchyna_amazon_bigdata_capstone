@@ -1,0 +1,29 @@
+{
+  "cloudwatch.emitMetrics": true,
+  "kinesis.endpoint": "kinesis.us-east-2.amazonaws.com",
+
+  "flows": [
+    {
+      "filePattern": "/tmp/capstone/views/*",
+      "kinesisStream": "proshchy_capstone_views_reviews_stream",
+      "skipHeaderLines": 1,
+      "partitionKeyOption": "RANDOM",
+      "dataProcessingOptions": [
+              {
+                      "optionName": "CSVTOJSON",
+                      "customFieldNames": ["tem_id","timestamp","user_agent","ip"]
+              }]
+    },    {
+      "filePattern": "/tmp/capstone/reviews/*",
+      "kinesisStream": "proshchy_capstone_views_reviews_stream",
+      "skipHeaderLines": 1,
+      "partitionKeyOption": "RANDOM",
+      "dataProcessingOptions": [
+              {
+                      "optionName": "CSVTOJSON",
+                      "customFieldNames": ["item_id","timestamp","user_agent","ip","review_title","review_text","stars"],
+                      "delimiter": "\\t"
+              }]
+    }
+      ]
+}

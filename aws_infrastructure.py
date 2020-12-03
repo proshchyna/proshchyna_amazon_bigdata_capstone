@@ -174,8 +174,20 @@ def clean_dynamodb():
 		print("Nothing to clean in DynamoDB!")
 
 
+def clean_kinesis_streams():
+	try:
+		client = boto3.client('kinesis')
+		client.delete_stream(
+			StreamName=os.environ.get('kinesis_data_stream_name'),
+			EnforceConsumerDeletion=True)
+		print("Kinesis Streams removed!")
+	except:
+		print("Has no Kinesis streams to delete!")
+
+
 def clean_infrastructure():
 	clean_ec2()
+	clean_kinesis_streams()
 	# clean_rds()
 	# clean_dynamodb()
 
@@ -194,6 +206,8 @@ def configure_ec2_instance():
 	sftp.put(localpath='configs/.aws/config', remotepath='/home/ec2-user/.aws/config')
 	sftp.put(localpath='configs/.aws/credentials', remotepath='/home/ec2-user/.aws/credentials')
 	sftp.put(localpath='configs/configure_ec2_environment.sh', remotepath='/home/ec2-user/configure_ec2_environment.sh')
+	sftp.put(localpath='configs/aws-kinesis-agent.json', remotepath='/home/ec2-user/agent.json')
+	# ssh.exec_command('sudo mv agent.json /etc/aws-kinesis/agent.json')
 	stdin, stdout, stderr = ssh.exec_command('sh /home/ec2-user/configure_ec2_environment.sh')
 	print('stdout:', stdout.read())
 	print('stderr:', stderr.read())
@@ -202,13 +216,22 @@ def configure_ec2_instance():
 	ssh.close()
 
 
+def launch_kinesis_data_stream():
+	import boto3
+	client = boto3.client('kinesis')
+	client.create_stream(StreamName=os.environ.get('kinesis_data_stream_name'), ShardCount=1)
+
+	print(f"Kinesis Data Stream: {os.environ.get('kinesis_data_stream_name')} launched!")
+
+
 def creating_iam_roles_with_policies():
 	client = boto3.client('iam')
 	# Creating IAM Role and Profile for EC2 instance.
 	ec2_policies = ['arn:aws:iam::aws:policy/AmazonEC2FullAccess',
 					'arn:aws:iam::aws:policy/AmazonS3FullAccess',
 					'arn:aws:iam::aws:policy/AmazonKinesisFullAccess',
-					'arn:aws:iam::aws:policy/AmazonKinesisFirehoseFullAccess']
+					'arn:aws:iam::aws:policy/AmazonKinesisFirehoseFullAccess',
+					'arn:aws:iam::aws:policy/CloudWatchFullAccess']
 	try:
 		role_name = os.environ.get('ec2_iam_role_profile_name')
 		client.create_instance_profile(InstanceProfileName=role_name)
@@ -242,6 +265,7 @@ def main():
 	# launch_rds()
 	# create_table_in_rds()
 	configure_ec2_instance()
+	launch_kinesis_data_stream()
 
 
 if __name__ == '__main__':

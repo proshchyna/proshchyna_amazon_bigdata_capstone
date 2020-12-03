@@ -70,7 +70,7 @@ def generate_views(size=100, datetime_interval=1):
 	views = list(zip(item_ids, timestamps, user_agents, ips))
 	header = 'item_id,timestamp,user_agent,ip\n'
 	file_prefix = str(datetime.now().timestamp())
-	with open(f'{os.path.abspath("")}/data/views/{file_prefix}_view.csv', 'w+') as views_file:
+	with open(f'/opt/capstone/views/{file_prefix}_view.csv', 'w+') as views_file:
 		views_file.write(header)
 		for view in views:
 			views_file.write(','.join(view) + '\n')
@@ -90,7 +90,7 @@ def generate_reviews(size=100, datetime_interval=1):
 	reviews = list(zip(item_ids, timestamps, user_agents, ips, review_titles, review_texts, stars))
 	header = 'item_id\ttimestamp\tuser_agent\tip\treview_title\treview_text\tstars\n'
 	file_prefix = str(datetime.now().timestamp())
-	with open(f'{os.path.abspath("")}/data/reviews/{file_prefix}_reviews.tsv', 'w+') as reviews_file:
+	with open(f'/opt/capstone/reviews/{file_prefix}_reviews.tsv', 'w+') as reviews_file:
 		reviews_file.write(header)
 		for review in reviews:
 			reviews_file.write('\t'.join(review) + '\n')

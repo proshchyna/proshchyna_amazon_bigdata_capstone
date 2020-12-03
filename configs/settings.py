@@ -4,6 +4,9 @@ import os
 dotenv_path = 'configs/.env'
 load_dotenv(dotenv_path)
 
-if not os.path.exists('data/reviews') or not os.path.exists('data/views'):
-	os.makedirs('data/reviews')
-	os.makedirs('data/views')
+try:
+	if not os.path.exists('/opt/capstone/views') or not os.path.exists('/opt/capstone/reviews'):
+		os.makedirs('/opt/capstone/reviews')
+		os.makedirs('/opt/capstone/views')
+except:
+	pass
