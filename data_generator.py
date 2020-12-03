@@ -33,7 +33,7 @@ def get_postgres_connection():
 
 def upload_items_to_postgres():
 	insert_statement = "INSERT INTO item (title, description, category) values ('{}', '{}', '{}')"
-	with open('data/items.csv') as items:
+	with open('items.csv') as items:
 		connection = get_postgres_connection()
 		cursor = connection.cursor()
 		line_counter = 0
