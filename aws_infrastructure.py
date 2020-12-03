@@ -5,6 +5,7 @@ import os
 import psycopg2
 import configs.settings
 from ec2_instance_connector import ssh_connect_with_retry, ssh
+import json
 
 
 def create_key_pair(key_pair_name: str) -> None:
@@ -36,12 +37,21 @@ def launch_ec2_instance():
 
 	instance_id = response[0].id
 	response[0].create_tags(Resources=[instance_id],
-							Tags=[{'Key': 'Name', 'Value': 'proshchy_capstone_ec2_instance'}])
+							Tags=[{'Key': 'Name', 'Value': os.environ.get('ec2_instance_name')}])
 
 	instance = ec2.Instance(instance_id)
 	instance.wait_until_running()
 	ip = instance.public_ip_address
-	print(f"FUCKING IP is: {ip}")
+
+	# Associating IAM Role with needed policies to EC2 instance.
+	client = boto3.client('ec2')
+	client.associate_iam_instance_profile(
+		IamInstanceProfile={
+			'Name': os.environ.get('ec2_iam_role_profile_name')
+		},
+		InstanceId=instance_id
+	)
+	# print(f"FUCKING IP is: {ip}")
 	print(f"EC2 instance: {instance_id} launched!")
 	return instance_id, ip
 
@@ -184,13 +194,40 @@ def configure_ec2_instance():
 	sftp.put(localpath='configs/.aws/config', remotepath='/home/ec2-user/.aws/config')
 	sftp.put(localpath='configs/.aws/credentials', remotepath='/home/ec2-user/.aws/credentials')
 	sftp.put(localpath='configs/configure_ec2_environment.sh', remotepath='/home/ec2-user/configure_ec2_environment.sh')
-	ssh.exec_command('sh /home/ec2-user/configure_ec2_environment.sh')
+	stdin, stdout, stderr = ssh.exec_command('sh /home/ec2-user/configure_ec2_environment.sh')
+	print('stdout:', stdout.read())
+	print('stderr:', stderr.read())
 	print("EC2 instance configured successfully!")
 	sftp.close()
 	ssh.close()
 
 
+def creating_iam_roles_with_policies():
+	client = boto3.client('iam')
+	# Creating IAM Role and Profile for EC2 instance.
+	ec2_policies = ['arn:aws:iam::aws:policy/AmazonEC2FullAccess',
+					'arn:aws:iam::aws:policy/AmazonS3FullAccess',
+					'arn:aws:iam::aws:policy/AmazonKinesisFullAccess',
+					'arn:aws:iam::aws:policy/AmazonKinesisFirehoseFullAccess']
+	try:
+		role_name = os.environ.get('ec2_iam_role_profile_name')
+		client.create_instance_profile(InstanceProfileName=role_name)
+		client.create_role(RoleName=role_name, AssumeRolePolicyDocument=json.dumps(
+			{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Principal": {"Service": "ec2.amazonaws.com"},
+													 "Action": "sts:AssumeRole"}]}))
+
+		for police in ec2_policies:
+			client.attach_role_policy(RoleName=role_name,
+									  PolicyArn=police)
+
+		client.add_role_to_instance_profile(InstanceProfileName=role_name,
+											RoleName=role_name)
+	except:
+		pass
+
+
 def main():
+	# TODO add data generation into cron based wrapper
 	print(os.environ.get("KeyPairName"))
 	clean_infrastructure()
 	# create_metadata_table_in_dynamodb()
