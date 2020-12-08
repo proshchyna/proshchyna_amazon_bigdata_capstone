@@ -232,8 +232,8 @@ def configure_ec2_instance():
 	sftp.put(localpath='configs/configure_ec2_environment.sh', remotepath='/home/ec2-user/configure_ec2_environment.sh')
 	sftp.put(localpath='configs/aws-kinesis-agent.json', remotepath='/home/ec2-user/agent.json')
 	stdin, stdout, stderr = ssh.exec_command('sh /home/ec2-user/configure_ec2_environment.sh')
-	# print('stdout:', stdout.read())
-	# print('stderr:', stderr.read())
+	print('stdout:', stdout.read())
+	print('stderr:', stderr.read())
 	print("EC2 instance configured successfully!")
 	sftp.close()
 	ssh.close()
@@ -246,7 +246,9 @@ def launch_kinesis_data_stream():
 	client_firehose.create_delivery_stream(DeliveryStreamName=os.environ.get('kinesis_view_stream_name'),
 										   DeliveryStreamType='DirectPut',
 										   S3DestinationConfiguration={
-											   'RoleARN': "arn:aws:iam::{}:role/firehose_delivery_role".format(boto3.client('sts').get_caller_identity().get('Account')),
+											   'RoleARN': "arn:aws:iam::{}:role/{}"
+										   .format(boto3.client('sts').get_caller_identity().get('Account'),
+												   os.environ.get('firehose_to_s3_iam_role_name')),
 											   'BucketARN': f"arn:aws:s3:::{os.environ.get('s3_bucket_name')}",
 											   'Prefix': 'views_'})
 	# client_kinesis.create_stream(StreamName=os.environ.get('kinesis_review_stream_name'), ShardCount=1)
