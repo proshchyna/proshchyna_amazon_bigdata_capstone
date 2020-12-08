@@ -176,13 +176,36 @@ def clean_dynamodb():
 
 def clean_kinesis_streams():
 	try:
+		client = boto3.client('firehose')
+		client.delete_delivery_stream(DeliveryStreamName=os.environ.get('kinesis_view_stream_name'))
+		print("Kinesis view Stream removed!")
+	except:
+		print("Has no Kinesis view Stream to delete!")
+
+	try:
 		client = boto3.client('kinesis')
 		client.delete_stream(
-			StreamName=os.environ.get('kinesis_data_stream_name'),
+			StreamName=os.environ.get('kinesis_review_stream_name'),
 			EnforceConsumerDeletion=True)
-		print("Kinesis Streams removed!")
+		print("Kinesis review Stream removed!")
 	except:
-		print("Has no Kinesis streams to delete!")
+		print("Has no Kinesis review Stream to delete!")
+
+
+def delete_s3_bucket():
+	try:
+		s3 = boto3.resource('s3')
+		bucket = s3.Bucket(os.environ.get('s3_bucket_name'))
+		bucket.objects.all()
+
+		for key in bucket.objects.all():
+			key.delete()
+
+		client = boto3.client('s3')
+		client.delete_bucket(Bucket=os.environ.get('s3_bucket_name'))
+		print("Bucket deleted!")
+	except:
+		print("Have no S3 Bucket to delete!")
 
 
 def clean_infrastructure():
@@ -190,6 +213,7 @@ def clean_infrastructure():
 	clean_kinesis_streams()
 	# clean_rds()
 	# clean_dynamodb()
+	# delete_s3_bucket()
 
 
 def configure_ec2_instance():
@@ -207,10 +231,9 @@ def configure_ec2_instance():
 	sftp.put(localpath='configs/.aws/credentials', remotepath='/home/ec2-user/.aws/credentials')
 	sftp.put(localpath='configs/configure_ec2_environment.sh', remotepath='/home/ec2-user/configure_ec2_environment.sh')
 	sftp.put(localpath='configs/aws-kinesis-agent.json', remotepath='/home/ec2-user/agent.json')
-	# ssh.exec_command('sudo mv agent.json /etc/aws-kinesis/agent.json')
 	stdin, stdout, stderr = ssh.exec_command('sh /home/ec2-user/configure_ec2_environment.sh')
-	print('stdout:', stdout.read())
-	print('stderr:', stderr.read())
+	# print('stdout:', stdout.read())
+	# print('stderr:', stderr.read())
 	print("EC2 instance configured successfully!")
 	sftp.close()
 	ssh.close()
@@ -218,10 +241,16 @@ def configure_ec2_instance():
 
 def launch_kinesis_data_stream():
 	import boto3
-	client = boto3.client('kinesis')
-	client.create_stream(StreamName=os.environ.get('kinesis_data_stream_name'), ShardCount=1)
-
-	print(f"Kinesis Data Stream: {os.environ.get('kinesis_data_stream_name')} launched!")
+	# client_kinesis = boto3.client('kinesis')
+	client_firehose = boto3.client('firehose')
+	client_firehose.create_delivery_stream(DeliveryStreamName=os.environ.get('kinesis_view_stream_name'),
+										   DeliveryStreamType='DirectPut',
+										   S3DestinationConfiguration={
+											   'RoleARN': "arn:aws:iam::{}:role/firehose_delivery_role".format(boto3.client('sts').get_caller_identity().get('Account')),
+											   'BucketARN': f"arn:aws:s3:::{os.environ.get('s3_bucket_name')}",
+											   'Prefix': 'views_'})
+	# client_kinesis.create_stream(StreamName=os.environ.get('kinesis_review_stream_name'), ShardCount=1)
+	print(f"Kinesis Data Streams launched!")
 
 
 def creating_iam_roles_with_policies():
@@ -248,6 +277,34 @@ def creating_iam_roles_with_policies():
 	except:
 		pass
 
+	# Creating IAM role for Firehose to S3 delivery.
+	try:
+		role_name = os.environ.get('firehose_to_s3_iam_role_name')
+		client.create_instance_profile(InstanceProfileName=role_name)
+		client.create_role(RoleName=role_name,
+						   AssumeRolePolicyDocument=json.dumps(
+							   {"Version": "2012-10-17", "Statement": [{"Effect": "Allow",
+																		"Principal": {"Service": "firehose.amazonaws.com"},
+									 "Action": "sts:AssumeRole"}]}))
+
+		client.attach_role_policy(RoleName=role_name, PolicyArn='arn:aws:iam::aws:policy/AmazonS3FullAccess')
+		client.add_role_to_instance_profile(InstanceProfileName=role_name,
+											RoleName=role_name)
+	except:
+		pass
+
+
+def create_s3_bucket():
+	try:
+		client = boto3.client('s3')
+		client.create_bucket(
+			Bucket=os.environ.get('s3_bucket_name'),
+			CreateBucketConfiguration={'LocationConstraint': 'us-east-2'}
+		)
+		print("S3 bucket has been created!")
+	except:
+		print("S3 bucket already created!")
+
 
 def main():
 	# TODO add data generation into cron based wrapper
@@ -256,6 +313,8 @@ def main():
 	# create_metadata_table_in_dynamodb()
 
 	create_key_pair(key_pair_name=os.environ.get('KeyPairName'))
+	creating_iam_roles_with_policies()
+	create_s3_bucket()
 
 	instance_id, ip = launch_ec2_instance()
 	os.environ['ec2_instance_id'] = instance_id
@@ -264,9 +323,8 @@ def main():
 	print(os.environ.get('ec2_instance_id'), os.environ.get('ec2_ip_address'))
 	# launch_rds()
 	# create_table_in_rds()
-	# creating_iam_roles_with_policies()
-	configure_ec2_instance()
 	launch_kinesis_data_stream()
+	configure_ec2_instance()
 
 
 if __name__ == '__main__':

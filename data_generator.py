@@ -12,6 +12,7 @@ from generate_items import generate_or_load_items
 def generate_items_if_needed(size):
 	if not os.path.exists('items.csv'):
 		generate_or_load_items(size)
+		upload_items_to_postgres()
 
 
 def get_postgres_connection():
@@ -98,7 +99,5 @@ def generate_reviews(size=100, datetime_interval=1):
 
 if __name__ == "__main__":
 	generate_items_if_needed(100)
-	upload_items_to_postgres()
-	# get_item_ids_from_postgres()
 	generate_views(size=10)
-	generate_reviews(size=10)
+	# generate_reviews(size=10)

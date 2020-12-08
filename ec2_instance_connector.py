@@ -1,4 +1,3 @@
-# ec2-18-223-247-115.us-east-2.compute.amazonaws.com
 import paramiko
 import time
 import os
@@ -10,7 +9,7 @@ def ssh_connect_with_retry(ssh, ip_address, retries):
     if retries > 3:
         return False
     privkey = paramiko.RSAKey.from_private_key_file('configs/proshchy_capstone_ec2.pem')
-    interval = 5
+    interval = 10
     try:
         retries += 1
         print('SSH into the instance: {}'.format(ip_address))
