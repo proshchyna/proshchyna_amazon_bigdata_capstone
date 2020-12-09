@@ -66,8 +66,8 @@ def generate_views(size=100, datetime_interval=1):
 	datetime_start = datetime.now() - timedelta(datetime_interval)
 	timestamps = [str(faker.date_time_between_dates(datetime_start=datetime_start).timestamp()) for _ in range(size)]
 	user_agents = [faker.user_agent() for _ in range(size)]
-	ips = [faker.ipv4() for _ in range(size)]
-
+	ips_pool = [faker.ipv4() for _ in range(size // 10)]
+	ips = [random.choice(ips_pool) for _ in range(size)]
 	views = list(zip(item_ids, timestamps, user_agents, ips))
 	header = 'item_id\ttimestamp\tuser_agent\tip\n'
 	file_prefix = str(datetime.now().timestamp())

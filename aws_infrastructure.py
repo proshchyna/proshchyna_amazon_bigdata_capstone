@@ -211,8 +211,8 @@ def delete_s3_bucket():
 def clean_infrastructure():
 	clean_ec2()
 	clean_kinesis_streams()
-	clean_rds()
-	clean_dynamodb()
+	# clean_rds()
+	# clean_dynamodb()
 	delete_s3_bucket()
 
 
@@ -312,10 +312,10 @@ def main():
 	# TODO add data generation into cron based wrapper
 	print(os.environ.get("KeyPairName"))
 	clean_infrastructure()
-	create_metadata_table_in_dynamodb()
+	# create_metadata_table_in_dynamodb()
 
 	create_key_pair(key_pair_name=os.environ.get('KeyPairName'))
-	creating_iam_roles_with_policies()
+	# creating_iam_roles_with_policies()
 	create_s3_bucket()
 
 	instance_id, ip = launch_ec2_instance()
@@ -323,8 +323,8 @@ def main():
 	os.environ['ec2_ip_address'] = ip
 
 	print(os.environ.get('ec2_instance_id'), os.environ.get('ec2_ip_address'))
-	launch_rds()
-	create_table_in_rds()
+	# launch_rds()
+	# create_table_in_rds()
 	launch_kinesis_data_stream()
 	configure_ec2_instance()
 
