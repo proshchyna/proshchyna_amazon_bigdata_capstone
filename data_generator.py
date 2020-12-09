@@ -98,6 +98,6 @@ def generate_reviews(size=100, datetime_interval=1):
 
 
 if __name__ == "__main__":
-	# generate_items_if_needed(100)
+	generate_items_if_needed(100)
 	generate_views(size=100)
 	# generate_reviews(size=10)
