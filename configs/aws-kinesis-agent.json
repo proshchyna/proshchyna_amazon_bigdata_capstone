@@ -12,7 +12,8 @@
       "dataProcessingOptions": [
               {
                       "optionName": "CSVTOJSON",
-                      "customFieldNames": ["item_id","date_timestamp","user_agent","ip"]
+                      "customFieldNames": ["item_id","date_timestamp","user_agent","ip"],
+                      "delimiter": "\\t"
               }]
     },    {
       "filePattern": "/tmp/capstone/reviews/*",

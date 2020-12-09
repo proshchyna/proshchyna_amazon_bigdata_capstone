@@ -69,12 +69,12 @@ def generate_views(size=100, datetime_interval=1):
 	ips = [faker.ipv4() for _ in range(size)]
 
 	views = list(zip(item_ids, timestamps, user_agents, ips))
-	header = 'item_id,timestamp,user_agent,ip\n'
+	header = 'item_id\ttimestamp\tuser_agent\tip\n'
 	file_prefix = str(datetime.now().timestamp())
-	with open(f'/tmp/capstone/views/{file_prefix}_view.csv', 'w+') as views_file:
+	with open(f'/tmp/capstone/views/{file_prefix}_view.tsv', 'w+') as views_file:
 		views_file.write(header)
 		for view in views:
-			views_file.write(','.join(view) + '\n')
+			views_file.write('\t'.join(view) + '\n')
 
 
 def generate_reviews(size=100, datetime_interval=1):
@@ -98,6 +98,6 @@ def generate_reviews(size=100, datetime_interval=1):
 
 
 if __name__ == "__main__":
-	generate_items_if_needed(100)
+	# generate_items_if_needed(100)
 	generate_views(size=100)
 	# generate_reviews(size=10)
