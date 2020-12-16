@@ -211,8 +211,8 @@ def delete_s3_bucket():
 def clean_infrastructure():
 	clean_ec2()
 	clean_kinesis_streams()
-	# clean_rds()
-	# clean_dynamodb()
+	clean_rds()
+	clean_dynamodb()
 	delete_s3_bucket()
 
 
@@ -241,7 +241,6 @@ def configure_ec2_instance():
 
 def launch_kinesis_data_stream():
 	import boto3
-	# client_kinesis = boto3.client('kinesis')
 	client_firehose = boto3.client('firehose')
 	client_firehose.create_delivery_stream(DeliveryStreamName=os.environ.get('kinesis_view_stream_name'),
 										   DeliveryStreamType='DirectPut',
@@ -251,8 +250,16 @@ def launch_kinesis_data_stream():
 												   os.environ.get('firehose_to_s3_iam_role_name')),
 											   'BucketARN': f"arn:aws:s3:::{os.environ.get('s3_bucket_name')}",
 											   'Prefix': 'views_'})
-	# client_kinesis.create_stream(StreamName=os.environ.get('kinesis_review_stream_name'), ShardCount=1)
-	print(f"Kinesis Data Streams launched!")
+
+	client_firehose.create_delivery_stream(DeliveryStreamName=os.environ.get('kinesis_review_stream_name'),
+										   DeliveryStreamType='DirectPut',
+										   S3DestinationConfiguration={
+											   'RoleARN': "arn:aws:iam::{}:role/{}"
+										   .format(boto3.client('sts').get_caller_identity().get('Account'),
+												   os.environ.get('firehose_to_s3_iam_role_name')),
+											   'BucketARN': f"arn:aws:s3:::{os.environ.get('s3_bucket_name')}",
+											   'Prefix': 'reviews_'})
+	print(f"Kinesis Delivery Streams launched!")
 
 
 def creating_iam_roles_with_policies():
@@ -309,13 +316,12 @@ def create_s3_bucket():
 
 
 def main():
-	# TODO add data generation into cron based wrapper
 	print(os.environ.get("KeyPairName"))
 	clean_infrastructure()
-	# create_metadata_table_in_dynamodb()
+	create_metadata_table_in_dynamodb()
 
 	create_key_pair(key_pair_name=os.environ.get('KeyPairName'))
-	# creating_iam_roles_with_policies()
+	creating_iam_roles_with_policies()
 	create_s3_bucket()
 
 	instance_id, ip = launch_ec2_instance()
@@ -323,8 +329,8 @@ def main():
 	os.environ['ec2_ip_address'] = ip
 
 	print(os.environ.get('ec2_instance_id'), os.environ.get('ec2_ip_address'))
-	# launch_rds()
-	# create_table_in_rds()
+	launch_rds()
+	create_table_in_rds()
 	launch_kinesis_data_stream()
 	configure_ec2_instance()
 

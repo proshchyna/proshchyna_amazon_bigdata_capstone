@@ -12,18 +12,18 @@
       "dataProcessingOptions": [
               {
                       "optionName": "CSVTOJSON",
-                      "customFieldNames": ["item_id","date_timestamp","user_agent","ip"],
+                      "customFieldNames": ["item_id","date_timestamp","device_type","ip"],
                       "delimiter": "\\t"
               }]
     },    {
       "filePattern": "/tmp/capstone/reviews/*",
-      "kinesisStream": "proshchy_capstone_reviews_stream",
+      "deliveryStream": "proshchy_capstone_reviews_stream",
       "skipHeaderLines": 1,
       "partitionKeyOption": "RANDOM",
       "dataProcessingOptions": [
               {
                       "optionName": "CSVTOJSON",
-                      "customFieldNames": ["item_id","date_timestamp","user_agent","ip","review_title","review_text","stars"],
+                      "customFieldNames": ["item_id","date_timestamp","device_type","ip","review_title","review_text","stars"],
                       "delimiter": "\\t"
               }]
     }

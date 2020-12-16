@@ -21,12 +21,3 @@ def ssh_connect_with_retry(ssh, ip_address, retries):
         time.sleep(interval)
         print('Retrying SSH connection to {}'.format(ip_address))
         ssh_connect_with_retry(ssh, ip_address, retries)
-
-
-# print(os.getenv('ec2_instance_id'))
-# ssh_connect_with_retry(ssh, 'ec2-18-223-247-115.us-east-2.compute.amazonaws.com', 0)
-#
-# stdin, stdout, stderr = ssh.exec_command("ls -l")
-# print('stdout:', stdout.read())
-# print('stderr:', stderr.read())
-# ssh.close()
