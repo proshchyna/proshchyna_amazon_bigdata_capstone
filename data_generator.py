@@ -73,8 +73,7 @@ def generate_views(size=100, datetime_interval=1):
 	views = list(zip(item_ids, timestamps, device_types, ips))
 	header = 'item_id\ttimestamp\tdevice_type\tip\n'
 	file_prefix = str(datetime.now().timestamp())
-	# with open(f'/tmp/capstone/views/{file_prefix}_view.tsv', 'w+') as views_file:
-	with open(f'data/views/{file_prefix}_view.tsv', 'w+') as views_file:
+	with open(f'/tmp/capstone/views/{file_prefix}_view.tsv', 'w+') as views_file:
 		views_file.write(header)
 		for view in views:
 			print(view)

@@ -185,7 +185,7 @@ def clean_kinesis_streams():
 	try:
 		client = boto3.client('firehose')
 		client.delete_delivery_stream(DeliveryStreamName=os.environ.get('kinesis_review_stream_name'))
-		print("Kinesis view Stream removed!")
+		print("Kinesis review Stream removed!")
 	except:
 		print("Has no Kinesis review Stream to delete!")
 
@@ -209,8 +209,8 @@ def delete_s3_bucket():
 def clean_infrastructure():
 	clean_ec2()
 	clean_kinesis_streams()
-	clean_rds()
-	clean_dynamodb()
+	# clean_rds()
+	# clean_dynamodb()
 	delete_s3_bucket()
 
 
@@ -316,7 +316,7 @@ def create_s3_bucket():
 def main():
 	print(os.environ.get("KeyPairName"))
 	clean_infrastructure()
-	create_metadata_table_in_dynamodb()
+	# create_metadata_table_in_dynamodb()
 
 	create_key_pair(key_pair_name=os.environ.get('KeyPairName'))
 	creating_iam_roles_with_policies()
@@ -327,8 +327,8 @@ def main():
 	os.environ['ec2_ip_address'] = ip
 
 	print(os.environ.get('ec2_instance_id'), os.environ.get('ec2_ip_address'))
-	launch_rds()
-	create_table_in_rds()
+	# launch_rds()
+	# create_table_in_rds()
 	launch_kinesis_data_stream()
 	configure_ec2_instance()
 
