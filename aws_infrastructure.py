@@ -183,11 +183,9 @@ def clean_kinesis_streams():
 		print("Has no Kinesis view Stream to delete!")
 
 	try:
-		client = boto3.client('kinesis')
-		client.delete_stream(
-			StreamName=os.environ.get('kinesis_review_stream_name'),
-			EnforceConsumerDeletion=True)
-		print("Kinesis review Stream removed!")
+		client = boto3.client('firehose')
+		client.delete_delivery_stream(DeliveryStreamName=os.environ.get('kinesis_review_stream_name'))
+		print("Kinesis view Stream removed!")
 	except:
 		print("Has no Kinesis review Stream to delete!")
 

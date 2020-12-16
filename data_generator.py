@@ -66,16 +66,18 @@ def generate_views(size=100, datetime_interval=1):
 	faker = Faker()
 	item_ids = get_item_ids_from_postgres()
 	datetime_start = datetime.now() - timedelta(datetime_interval)
-	timestamps = [faker.date_time_between_dates(datetime_start=datetime_start).timestamp() for _ in range(size)]
+	timestamps = [str(faker.date_time_between_dates(datetime_start=datetime_start).timestamp()) for _ in range(size)]
 	device_types = [random.choice(['desktop', 'mobile', 'tablet']) for _ in range(size)]
 	ips_pool = [faker.ipv4() for _ in range(size // 10)]
 	ips = [random.choice(ips_pool) for _ in range(size)]
 	views = list(zip(item_ids, timestamps, device_types, ips))
 	header = 'item_id\ttimestamp\tdevice_type\tip\n'
 	file_prefix = str(datetime.now().timestamp())
-	with open(f'/tmp/capstone/views/{file_prefix}_view.tsv', 'w+') as views_file:
+	# with open(f'/tmp/capstone/views/{file_prefix}_view.tsv', 'w+') as views_file:
+	with open(f'data/views/{file_prefix}_view.tsv', 'w+') as views_file:
 		views_file.write(header)
 		for view in views:
+			print(view)
 			views_file.write('\t'.join(view) + '\n')
 
 
