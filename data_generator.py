@@ -1,3 +1,7 @@
+"""
+This is a log generator. The purpose of this module is to generate views, reviews, items
+and store them in file system(views, reviews), S3 and Postgres (items).
+"""
 import psycopg2
 import boto3
 import json

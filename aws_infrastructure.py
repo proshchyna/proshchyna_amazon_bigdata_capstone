@@ -22,6 +22,7 @@ def create_key_pair(key_pair_name: str) -> None:
 		f.write(response['KeyMaterial'])
 
 	os.chmod(key_path, 0o400)
+	print("Key Pair for EC2 instance ready!")
 
 
 def launch_ec2_instance():
@@ -51,7 +52,6 @@ def launch_ec2_instance():
 		},
 		InstanceId=instance_id
 	)
-	# print(f"FUCKING IP is: {ip}")
 	print(f"EC2 instance: {instance_id} launched!")
 	return instance_id, ip
 
@@ -85,13 +85,14 @@ def launch_rds():
 		status = db_info['DBInstances'][0]['DBInstanceStatus']
 		if status == 'available':
 			break
-		sleep(5)
+		sleep(10)
+		print("Postgres is not ready yet!")
 
 	db_info = client.describe_db_instances(DBInstanceIdentifier=os.environ.get('DBInstanceIdentifier'))
 	host = db_info['DBInstances'][0]['Endpoint']['Address']
 	dynamodb.put_item(TableName=os.environ.get('DynamoDb_table_name'), Item={'PostgresHost': {'S': host}, 'id': {'N': '1'}})
 
-	print("Postgres instance created!")
+	print("Postgres instance ready!")
 
 
 def create_table_in_rds():
@@ -105,6 +106,7 @@ def create_table_in_rds():
 		connection = get_postgres_connection()
 		cursor = connection.cursor()
 		cursor.execute(create_table_statement)
+		print("Table in Postgres instance created!")
 	except(Exception, psycopg2.DatabaseError) as error:
 		print("Error while creating PostgreSQL table", error)
 	finally:
@@ -209,20 +211,14 @@ def delete_s3_bucket():
 def clean_infrastructure():
 	clean_ec2()
 	clean_kinesis_streams()
-	# clean_rds()
-	# clean_dynamodb()
+	clean_rds()
+	clean_dynamodb()
 	delete_s3_bucket()
 
 
 def configure_ec2_instance():
-	# 'ec2-18-223-247-115.us-east-2.compute.amazonaws.com'
 	ssh_connect_with_retry(ssh, os.environ.get('ec2_ip_address'), 0)
 	sftp = ssh.open_sftp()
-
-	# stdin, stdout, stderr = ssh.exec_command("ls -l")
-	# print('stdout:', stdout.read())
-	# print('stderr:', stderr.read())
-	# ssh.close()
 
 	ssh.exec_command("mkdir .aws")
 	sftp.put(localpath='configs/.aws/config', remotepath='/home/ec2-user/.aws/config')
